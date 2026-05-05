@@ -199,6 +199,24 @@
       .markdown h3 { font-size: 16px; }
       .markdown ul, .markdown ol { margin: 0 0 10px 22px; padding: 0; }
       .markdown li { margin: 3px 0; }
+      .markdown table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        margin: 10px 0;
+        font-size: 13px;
+      }
+      .markdown th,
+      .markdown td {
+        border: 1px solid var(--line);
+        padding: 6px 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+      .markdown th {
+        background: #f8fafc;
+        font-weight: 800;
+      }
       .markdown code {
         border: 1px solid #d9dee7;
         border-radius: 4px;
@@ -355,6 +373,16 @@
         html = html.replace(/(?<!_)_([^_\n]+)_(?!_)/g, "<em>$1</em>");
         return html;
       }
+      function isTableRow(line) {
+        const trimmed = line.trim();
+        return trimmed.startsWith("|") && trimmed.includes("|", 1);
+      }
+      function isTableSeparator(line) {
+        return /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(line.trim());
+      }
+      function splitTableRow(line) {
+        return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+      }
       function markdownToHtml(raw) {
         const text = String(raw ?? "").replace(/\r\n/g, "\n");
         const lines = text.split("\n");
@@ -363,11 +391,26 @@
         let listType = "";
         let inCode = false;
         let codeLines = [];
+        let tableRows = [];
+        let tableHasSeparator = false;
         function flushParagraph() {
           if (paragraph.length) {
             out.push(`<p>${renderInlineMarkdown(paragraph.join(" "))}</p>`);
             paragraph = [];
           }
+        }
+        function flushTable() {
+          if (!tableRows.length) return;
+          if (!tableHasSeparator || tableRows.length < 2) {
+            paragraph.push(...tableRows.map((row) => row.join(" | ")));
+          } else {
+            const [head, ...body] = tableRows;
+            const headHtml = head.map((cell) => `<th>${renderInlineMarkdown(cell)}</th>`).join("");
+            const bodyHtml = body.map((row) => `<tr>${row.map((cell) => `<td>${renderInlineMarkdown(cell)}</td>`).join("")}</tr>`).join("");
+            out.push(`<table><thead><tr>${headHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`);
+          }
+          tableRows = [];
+          tableHasSeparator = false;
         }
         function closeList() {
           if (listType) {
@@ -390,6 +433,7 @@
               codeLines = [];
               inCode = false;
             } else {
+              flushTable();
               flushParagraph();
               closeList();
               inCode = true;
@@ -401,10 +445,22 @@
             continue;
           }
           if (!trimmed) {
+            flushTable();
             flushParagraph();
             closeList();
             continue;
           }
+          if (isTableRow(trimmed) || (tableRows.length && isTableSeparator(trimmed))) {
+            flushParagraph();
+            closeList();
+            if (tableRows.length === 1 && isTableSeparator(trimmed)) {
+              tableHasSeparator = true;
+            } else if (!isTableSeparator(trimmed)) {
+              tableRows.push(splitTableRow(trimmed));
+            }
+            continue;
+          }
+          flushTable();
           if (/^---+$/.test(trimmed) || /^\*\*\*+$/.test(trimmed)) {
             flushParagraph();
             closeList();
@@ -443,6 +499,7 @@
           paragraph.push(trimmed);
         }
         if (inCode) out.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
+        flushTable();
         flushParagraph();
         closeList();
         return `<div class="markdown">${out.join("")}</div>`;
