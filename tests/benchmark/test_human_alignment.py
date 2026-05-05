@@ -6,6 +6,7 @@ from pathlib import Path
 
 from benchmark.human_alignment.common import METRIC_CODES
 from benchmark.human_alignment.export_annotations import export_annotation_package
+from benchmark.human_alignment.plot_alignment import build_svg
 from benchmark.human_alignment.summarize_annotations import summarize_annotations
 
 
@@ -271,3 +272,28 @@ def test_summarize_pairwise_annotations_majority_and_llm_threshold(tmp_path: Pat
     assert summary["pairs"][0]["metrics"]["SF"]["human_backend_preference"] == "target"
     assert summary["pairs"][1]["metrics"]["SF"]["llm_backend_preference"] == "tie"
     assert (tmp_path / "human" / "summary.md").exists()
+
+
+def test_plot_alignment_builds_svg_from_summary() -> None:
+    summary = {
+        "metrics": {
+            code: {
+                "human_target_preference_rate": 0.6,
+                "human_tie_rate": 0.2,
+                "human_baseline_preference_rate": 0.2,
+                "llm_target_preference_rate": 0.7,
+                "llm_tie_rate": 0.1,
+                "llm_baseline_preference_rate": 0.2,
+            }
+            for code in METRIC_CODES
+        }
+    }
+
+    svg = build_svg(summary, "Human vs. LLM Preference Alignment")
+
+    assert svg.startswith("<svg")
+    assert "Human vs. LLM Preference Alignment" in svg
+    assert "DeepTutor preferred" in svg
+    assert "Mock preferred" in svg
+    assert ">60<" in svg
+    assert ">70<" in svg

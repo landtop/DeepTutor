@@ -179,6 +179,11 @@ python3 -m benchmark.human_alignment.summarize_annotations \
   --annotations benchmark/data/bench_pipeline/human_alignment_pairwise/completed_annotations.csv \
   --key benchmark/data/bench_pipeline/human_alignment_pairwise/annotation_key.json \
   --tie-threshold 0.25
+
+# 4. Plot preference alignment
+python3 -m benchmark.human_alignment.plot_alignment \
+  --summary benchmark/data/bench_pipeline/human_alignment_pairwise/human_alignment_summary.json \
+  --output benchmark/data/bench_pipeline/human_alignment_pairwise/human_alignment_preference_alignment.svg
 ```
 
 Outputs:
@@ -189,6 +194,7 @@ Outputs:
 - `annotation_key.json`: private mapping from annotation IDs to backend/eval files
 - `human_alignment_summary.json/.md`: per-metric DeepTutor preference rates,
   LLM preference rates, agreement, kappa, tie rates, and inter-rater agreement
+- `human_alignment_preference_alignment.svg`: stacked human-vs-LLM preference plot
 
 Human preferences use the same Step 3 dimensions, but raters choose `A`, `B`,
 or `tie` for each metric: `SF`, `PER`, `APP`, `VID`, `LD`, `FIT`, `GND`, `DIV`,

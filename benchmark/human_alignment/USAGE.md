@@ -202,7 +202,39 @@ human_alignment_summary.json
 human_alignment_summary.md
 ```
 
-## 8. 汇总结果怎么看
+## 8. 画 human-vs-LLM preference 图
+
+如果已经有 `completed_annotations_all.csv`，可以直接从 CSV 和 private key 生成 summary 与 SVG 图：
+
+```bash
+python3 -m benchmark.human_alignment.plot_alignment \
+  --annotations benchmark/data/bench_pipeline/human_alignment_pairwise/completed_annotations_all.csv \
+  --key benchmark/data/bench_pipeline/human_alignment_pairwise/annotation_key.json \
+  --tie-threshold 0.25 \
+  --output benchmark/data/bench_pipeline/human_alignment_pairwise/human_alignment_preference_alignment.svg
+```
+
+如果已经先跑过汇总，也可以直接从 `human_alignment_summary.json` 画图：
+
+```bash
+python3 -m benchmark.human_alignment.plot_alignment \
+  --summary benchmark/data/bench_pipeline/human_alignment_pairwise/human_alignment_summary.json \
+  --output benchmark/data/bench_pipeline/human_alignment_pairwise/human_alignment_preference_alignment.svg
+```
+
+图中：
+
+```text
+H = human majority preference
+L = LLM-judge preference
+绿色 = DeepTutor preferred
+灰色 = tie
+红色 = Mock preferred
+```
+
+柱子里的数字表示 DeepTutor preference rate。即使 CSV 只标注了一部分 pair，也可以先画 pilot 图；图里的比例只基于已完成标注的 pair。
+
+## 9. 汇总结果怎么看
 
 每个 metric 会报告：
 
@@ -222,4 +254,3 @@ target    = deep_tutor
 baseline  = mock
 tie
 ```
-
