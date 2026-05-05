@@ -156,43 +156,43 @@ python3 -m benchmark.evaluation.run --transcript xxx.json -o results.json
 - Saved by default to `benchmark/data/evaluations/{stem}_eval_{timestamp}.json`
 - Supports both single-session and multi-session transcripts
 
-## 3.5 Human Alignment Pilot
+## 3.5 Pairwise Human Alignment Pilot
 
 This workflow reuses Step 2 transcripts and Step 3 LLM judge outputs, then asks
-human raters to score the same benchmark dimensions on a blind package.
+human raters to compare matched DeepTutor-vs-baseline sessions in a blinded A/B
+package.
 
 ```bash
 # 1. Export blind annotation materials
 python3 -m benchmark.human_alignment.export_annotations \
   --output-root benchmark/data/bench_pipeline \
   --kb-names "Calculus,LinearAlgebra" \
-  --backends "deep_tutor,mock,cot" \
-  --limit-per-backend 12
+  --target-backend deep_tutor \
+  --baseline-backend mock \
+  --limit-pairs 40
 
 # 2. Human raters fill the generated CSV template:
-# benchmark/data/bench_pipeline/human_alignment/annotation_template.csv
+# benchmark/data/bench_pipeline/human_alignment_pairwise/annotation_template.csv
 
 # 3. Summarize human-vs-LLM alignment
 python3 -m benchmark.human_alignment.summarize_annotations \
-  --annotations benchmark/data/bench_pipeline/human_alignment/completed_annotations.csv \
-  --key benchmark/data/bench_pipeline/human_alignment/annotation_key.json
+  --annotations benchmark/data/bench_pipeline/human_alignment_pairwise/completed_annotations.csv \
+  --key benchmark/data/bench_pipeline/human_alignment_pairwise/annotation_key.json \
+  --tie-threshold 0.25
 ```
 
 Outputs:
 
-- `annotation_package.jsonl`: anonymized material for raters; backend is hidden
-- `annotation_template.csv`: required human score schema
+- `annotation_package.jsonl`: anonymized A/B pair material for raters; backend is hidden
+- `annotation_template.csv`: required human preference schema
 - `review_ui.html`: browser-based scoring UI; open it and load `annotation_package.jsonl`
 - `annotation_key.json`: private mapping from annotation IDs to backend/eval files
-- `human_alignment_summary.json/.md`: human averages, LLM averages, MAE,
-  Spearman/Kendall correlations, pairwise ranking agreement, backend ranks, and
-  inter-rater pairwise correlations
+- `human_alignment_summary.json/.md`: per-metric DeepTutor preference rates,
+  LLM preference rates, agreement, kappa, tie rates, and inter-rater agreement
 
-Human scores use the same 1-5 Step 3 dimensions:
-`source_faithfulness`, `personalization`, `applicability`, `vividness`,
-`logical_depth`, `pq_fitness`, `pq_groundedness`, `pq_diversity`,
-`pq_answer_quality`, and `pq_cross_concept`. `turn_count` remains objective
-metadata and is not scored by raters.
+Human preferences use the same Step 3 dimensions, but raters choose `A`, `B`,
+or `tie` for each metric: `SF`, `PER`, `APP`, `VID`, `LD`, `FIT`, `GND`, `DIV`,
+`ANS`, and `CC`.
 
 ## 4. End-to-End Example
 

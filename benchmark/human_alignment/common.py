@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared helpers for human-alignment annotation export and analysis."""
+"""Shared helpers for pairwise human-alignment annotation."""
 
 from __future__ import annotations
 
@@ -7,54 +7,63 @@ import json
 from pathlib import Path
 from typing import Any
 
-METRIC_FIELDS = [
-    "source_faithfulness",
-    "personalization",
-    "applicability",
-    "vividness",
-    "logical_depth",
-    "pq_fitness",
-    "pq_groundedness",
-    "pq_diversity",
-    "pq_answer_quality",
-    "pq_cross_concept",
+METRICS = [
+    ("SF", "source_faithfulness", "Source faithfulness"),
+    ("PER", "personalization", "Personalization"),
+    ("APP", "applicability", "Applicability"),
+    ("VID", "vividness", "Vividness"),
+    ("LD", "logical_depth", "Logical depth"),
+    ("FIT", "pq_fitness", "Practice question fitness"),
+    ("GND", "pq_groundedness", "Practice question groundedness"),
+    ("DIV", "pq_diversity", "Practice question diversity"),
+    ("ANS", "pq_answer_quality", "Practice question answer quality"),
+    ("CC", "pq_cross_concept", "Practice question cross-concept"),
 ]
 
-ANNOTATION_COLUMNS = [
-    "annotation_id",
+METRIC_CODES = [code for code, _, _ in METRICS]
+METRIC_BY_CODE = {code: {"key": key, "label": label} for code, key, label in METRICS}
+
+PAIRWISE_COLUMNS = [
+    "pair_id",
     "rater_id",
-    *METRIC_FIELDS,
+    *METRIC_CODES,
     "comment",
 ]
 
-RUBRIC_VERSION = "benchmark_step3_human_v1"
+PREFERENCE_VALUES = {"A", "B", "tie"}
+RUBRIC_VERSION = "benchmark_step3_pairwise_human_v1"
 
-RUBRIC_MARKDOWN = """# DeepTutor Human Alignment Rubric
+RUBRIC_MARKDOWN = """# DeepTutor Pairwise Human Alignment Rubric
 
-Use the same 1-5 scale as the benchmark Step 3 LLM judge.
+You will compare two anonymous tutoring sessions, System A and System B. Both systems
+respond to the same student profile, task, knowledge gaps, and source excerpts.
 
-## Scale
+For each metric, choose:
 
-- 5: Excellent; strong, consistent evidence.
-- 4: Good; clear evidence with only minor issues.
-- 3: Adequate; acceptable but generic or uneven.
-- 2: Weak; notable flaws.
-- 1: Poor; mostly missing, incorrect, or unhelpful.
+- `A`: System A is better.
+- `B`: System B is better.
+- `tie`: The two systems are comparable, or the difference is too small to judge reliably.
 
-## Metrics
+Prefer a side when there is a clear quality difference. Use `tie` only when the evidence is
+genuinely close or insufficient.
 
-- `source_faithfulness`: Tutor responses are faithful to the provided source excerpts.
-- `personalization`: Tutor adapts to the student profile, knowledge state, and current confusion.
-- `applicability`: Tutor responses help the student make progress on the task.
-- `vividness`: Explanations are concrete, vivid, and supported by examples where useful.
-- `logical_depth`: Reasoning and concept development are sufficiently deep and coherent.
-- `pq_fitness`: Practice questions fit the student and target gaps.
-- `pq_groundedness`: Practice questions are consistent with the source excerpts.
-- `pq_diversity`: Practice questions cover varied angles rather than repeating one pattern.
-- `pq_answer_quality`: Practice question options/answers are well formed and non-trivial.
-- `pq_cross_concept`: Practice questions connect related concepts where appropriate.
+## Transcript metrics
 
-`turn_count` is objective metadata and should not be scored by human raters.
+- `SF` / source faithfulness: Which tutor is more faithful to the source excerpts and less likely to hallucinate or contradict them?
+- `PER` / personalization: Which tutor better adapts to the student's profile, knowledge state, and confusion across the whole session?
+- `APP` / applicability: Which tutor better helps the student make progress on the task and success criteria?
+- `VID` / vividness: Which tutor gives more concrete, vivid, and example-supported explanations?
+- `LD` / logical depth: Which tutor gives deeper, more coherent conceptual reasoning?
+
+## Practice question metrics
+
+- `FIT` / fitness: Which set of practice questions better fits the student and target gaps?
+- `GND` / groundedness: Which set is more consistent with the source excerpts?
+- `DIV` / diversity: Which set covers more varied angles rather than repeating one pattern?
+- `ANS` / answer quality: Which set has better options, answers, and non-trivial distractors?
+- `CC` / cross-concept: Which set better connects related concepts where appropriate?
+
+Do not try to identify the system. The backend identity is intentionally hidden.
 """
 
 
@@ -70,16 +79,6 @@ def write_json(path: str | Path, data: Any) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def iter_jsonl(path: str | Path) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                rows.append(json.loads(line))
-    return rows
-
-
 def write_jsonl(path: str | Path, rows: list[dict[str, Any]]) -> None:
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -88,20 +87,12 @@ def write_jsonl(path: str | Path, rows: list[dict[str, Any]]) -> None:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def clamp_score(raw: Any) -> float | None:
-    if raw is None:
-        return None
-    if isinstance(raw, str) and not raw.strip():
-        return None
-    try:
-        value = float(raw)
-    except (TypeError, ValueError):
-        return None
-    if value < 1 or value > 5:
-        return None
-    return value
-
-
-def safe_avg(values: list[float]) -> float | None:
-    return round(sum(values) / len(values), 4) if values else None
-
+def normalize_preference(raw: Any) -> str | None:
+    value = str(raw or "").strip().lower()
+    if value in {"a", "system_a", "system a", "a better"}:
+        return "A"
+    if value in {"b", "system_b", "system b", "b better"}:
+        return "B"
+    if value in {"tie", "equal", "same", "draw", "相当", "平手"}:
+        return "tie"
+    return None
