@@ -22,11 +22,9 @@ Usage:
     from src.services.config import load_config_with_main
 """
 
-# Note: rag and embedding modules are lazy-loaded via __getattr__
-# to avoid importing heavy dependencies (lightrag, llama_index) at module load time
-from . import config, llm, prompt, search, session, setup
-from .path_service import PathService, get_path_service
-from .session import BaseSessionManager
+# Modules are lazy-loaded via __getattr__ to avoid importing optional
+# dependencies (PyYAML, lightrag, llama_index, etc.) at package import time.
+from importlib import import_module
 
 __all__ = [
     "llm",
@@ -44,13 +42,13 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    """Lazy import for modules that depend on heavy libraries."""
-    if name == "rag":
-        from . import rag
-
-        return rag
-    if name == "embedding":
-        from . import embedding
-
-        return embedding
+    """Lazy import service modules and common service symbols."""
+    if name in {"config", "llm", "prompt", "search", "setup", "session", "rag", "embedding"}:
+        return import_module(f"{__name__}.{name}")
+    if name in {"PathService", "get_path_service"}:
+        module = import_module(f"{__name__}.path_service")
+        return getattr(module, name)
+    if name == "BaseSessionManager":
+        module = import_module(f"{__name__}.session")
+        return module.BaseSessionManager
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
